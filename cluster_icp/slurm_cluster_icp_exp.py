@@ -447,9 +447,7 @@ def single_run(q, m, n, p_between_cluster, p_within_var, p_between_var, k=None, 
     candidate_clusters = [c for c in clusters if c != E and c != Y]
     if s is not None:
         cluster_idxs = get_cluster_idxs(cluster_vars, var2idx)
-        # screen on one half of the data and test on the other
-        X_screen, X = X[:n // 2], X[n // 2:]
-        candidate_clusters = choose_candidate_groups(X_screen, cluster_idxs, E, Y, s)
+        candidate_clusters = choose_candidate_groups(X, cluster_idxs, E, Y, s)
 
     # parents in the induced CDAG, after removing edges from E to Y
     var2cluster = {v: c for c, vars_ in cluster_vars.items() for v in vars_}

@@ -124,4 +124,4 @@ if __name__ == "__main__":
     plot_test_stat(pd.read_csv(os.path.join(corrected_dir, "test_stat.csv")),
                    os.path.join(figure_dir, "test_statistic_comparison_parents_corrected.png"))
     screening = pd.concat([pd.read_csv(f, index_col=0) for f in glob.glob(os.path.join(rerun_dir, "group_lasso_*.csv"))])
-    plot_vary_s(screening, os.path.join(figure_dir, "vary_s_split.png"))
+    plot_vary_s(screening, os.path.join(figure_dir, "vary_s_fixed.png"))
