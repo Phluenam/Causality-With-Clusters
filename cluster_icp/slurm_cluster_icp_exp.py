@@ -353,7 +353,7 @@ def get_cluster_idxs(cluster_vars, var2idx):
             cluster_idxs[k].append(var2idx[v])
     return cluster_idxs
 
-def choose_candidate_groups(X, cluster_idxs, E, Y, s, fix_screening=False):
+def choose_candidate_groups(X, cluster_idxs, E, Y, s):
     exclude = {E, Y}
     candidate_clusters = {g: idxs for g, idxs in cluster_idxs.items()
                           if g not in exclude}
@@ -387,7 +387,7 @@ def choose_candidate_groups(X, cluster_idxs, E, Y, s, fix_screening=False):
     state = ad.grpnet(X_cand, glm, groups=groups, progress_bar=False)
     # count active groups at each lambda
     # multi-response coefficients are laid out per predictor, then per response
-    n_responses = Y_mat.shape[1] if fix_screening else 1
+    n_responses = Y_mat.shape[1]
     n_active = []
     active_group_sets = []
     for i in range(len(state.lmdas)):
@@ -420,7 +420,7 @@ def choose_candidate_groups(X, cluster_idxs, E, Y, s, fix_screening=False):
 
     return selected
 
-def single_run(q, m, n, p_between_cluster, p_within_var, p_between_var, k=None, s=None, seed=None, env_mode="default", test_statistic="Wilks' lambda", alpha=0.05, num_levels=None, fix_parents=False, fix_screening=False, sample_split=False):
+def single_run(q, m, n, p_between_cluster, p_within_var, p_between_var, k=None, s=None, seed=None, env_mode="default", test_statistic="Wilks' lambda", alpha=0.05, num_levels=None):
     assert env_mode in ["default", "categorical", "dependent"]
     np.random.seed(seed)
     Gc = generate_cluster_dag(q, p_between=p_between_cluster, k=k, seed=seed)
@@ -448,16 +448,12 @@ def single_run(q, m, n, p_between_cluster, p_within_var, p_between_var, k=None, 
     if s is not None:
         cluster_idxs = get_cluster_idxs(cluster_vars, var2idx)
         # screen on one half of the data and test on the other
-        X_screen = X[:n // 2] if sample_split else X
-        X = X[n // 2:] if sample_split else X
-        candidate_clusters = choose_candidate_groups(X_screen, cluster_idxs, E, Y, s, fix_screening=fix_screening)
+        X_screen, X = X[:n // 2], X[n // 2:]
+        candidate_clusters = choose_candidate_groups(X_screen, cluster_idxs, E, Y, s)
 
-    if fix_parents:
-        # parents in the induced CDAG, after removing edges from E to Y
-        var2cluster = {v: c for c, vars_ in cluster_vars.items() for v in vars_}
-        parents = {var2cluster[u] for v in cluster_vars[Y] for u in G.predecessors(v)} - {Y}
-    else:
-        parents = set(list(Gc.predecessors(Y)))
+    # parents in the induced CDAG, after removing edges from E to Y
+    var2cluster = {v: c for c, vars_ in cluster_vars.items() for v in vars_}
+    parents = {var2cluster[u] for v in cluster_vars[Y] for u in G.predecessors(v)} - {Y}
     num_parents = len(parents)
     num_candidates = len(candidate_clusters)
     num_parents_in_candidates = len(parents & set(candidate_clusters))
@@ -468,7 +464,6 @@ def single_run(q, m, n, p_between_cluster, p_within_var, p_between_var, k=None, 
         "num_candidates": num_candidates,
         "num_parents": num_parents,
         "num_parents_in_candidates": num_parents_in_candidates,
-        "E_in_parents": int(E in parents),
         "num_S_CICP": len(S_CICP),
         "num_predicted": len(S_hat),
         # S_hat vs parents
@@ -499,9 +494,6 @@ parser = argparse.ArgumentParser(description="Run experiment with a seed")
 parser.add_argument("-s", "--seeds", type=str, default="0", help="Seeds to run")
 parser.add_argument("-o", "--output-dir", type=str, default="csvs", help="Where to output")
 parser.add_argument("-e", "--experiment", type=str, default="default", help="experiment to run", choices=["default", "test_stat", "group_lasso", "dependent_env", "categorical_env"])
-parser.add_argument("--fix-parents", action="store_true", help="Take parents of Y from the variable DAG, so E is never a parent")
-parser.add_argument("--fix-screening", action="store_true", help="Read multi-response group LASSO coefficients with the correct layout")
-parser.add_argument("--sample-split", action="store_true", help="Screen on one half of the data and test on the other")
 
 # 3. Parse arguments
 args = parser.parse_args()
@@ -574,7 +566,7 @@ elif args.experiment == "group_lasso":
                         for seed in run_seeds:
                             print(q, m, n, k, s, density_name, seed)
                             t0 = time.time()
-                            row = single_run(q + 2, m, n, p_between_cluster, p_within_var, p_between_var, k=k, s=s, seed=seed, fix_parents=args.fix_parents, fix_screening=args.fix_screening, sample_split=args.sample_split)
+                            row = single_run(q + 2, m, n, p_between_cluster, p_within_var, p_between_var, k=k, s=s, seed=seed)
                             elapsed = time.time() - t0
                             row.update({"q": q, "m": m, "n": n, "k": k, "s": s, "Setting": density_name, "seed": seed, "Time": elapsed})
                             rows.append(row)
